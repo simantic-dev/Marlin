@@ -1,0 +1,17 @@
+machines:
+  dut:
+    mcu: STM32F446ZE
+    overlay: octopus.board
+    elf: ../.pio/build/STM32F446ZE_btt/firmware.elf
+    parts:
+      - { name: host, type: uart-device, baud: 115200, script: host_peer.py }
+      # inputs: X Y Z E STEP, X Y Z E DIR, HEATER_0; outputs: X Y Z min endstops
+      - name: machine
+        type: gpio-device
+        script: machine_peer.py
+        inputs: [PF13, PG0, PF11, PF9, PF12, PG1, PG3, PF10, PA2]
+        outputs: [PG6, PG9, PG10]
+      - { name: thermal, type: peripheral, address: 0xA0001000, size: 0x4, script: thermal_peer.py }
+media:
+  - type: uart
+    connect: [dut.usart1, dut.host]
