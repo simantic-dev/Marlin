@@ -45,7 +45,7 @@ def heater_take_duty(t_us, since_us):
 
 
 def _table():
-    text = open(os.path.join(HERE, "..", "Marlin/src/module/thermistor/thermistor_1.h")).read()
+    text = open(os.path.join(HERE, "thermistor_1.h")).read()
     rows = [(int(a), int(b)) for a, b in re.findall(r"OV\(\s*(\d+)\)\s*,\s*(-?\d+)\s*\}", text)]
     return sorted(rows)  # raw (10-bit scale) ascending, temperature descending
 

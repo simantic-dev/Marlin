@@ -2,7 +2,7 @@ machines:
   dut:
     mcu: STM32F446ZE
     overlay: octopus.board
-    elf: ../.pio/build/STM32F446ZE_btt/firmware.elf
+    elf: fw/marlin_octopus.elf
     parts:
       - { name: host, type: uart-device, baud: 115200, script: host_peer.py }
       # inputs: X Y Z E STEP, X Y Z E DIR, HEATER_0; outputs: X Y Z min endstops

@@ -1,0 +1,19 @@
+; short CI job: banner, cold-extrusion allowed, home, 40 mm square, diagonal. No heat-up wait.
+M115
+M155 S1
+M104 S190
+M302 P1
+G28
+M114
+G90
+M83
+G1 Z0.3 F600
+G1 X30 Y30 F6000
+G1 X70 Y30 E1.6 F3000
+G1 X70 Y70 E1.6
+G1 X30 Y70 E1.6
+G1 X30 Y30 E1.6
+G1 X70 Y70 F3000
+M400
+M114
+M104 S0
