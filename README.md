@@ -1,5 +1,7 @@
 > **This fork:** [`sim/`](sim/README.md) runs Marlin on a simulated STM32F446ZE (BTT Octopus V1.1) with a simulated hotend, endstops and G-code host, no printer needed. Unofficial; GPL-3.0 as upstream.
 
+![Marlin printing on a simulated BTT Octopus](sim/screenshots/print.gif)
+
 <p align="center"><img src="buildroot/share/pixmaps/logo/marlin-outrun-nf-500.png" height="250" alt="MarlinFirmware's logo" /></p>
 
 <h1 align="center">Marlin 3D Printer Firmware</h1>

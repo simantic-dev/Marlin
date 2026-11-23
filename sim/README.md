@@ -1,5 +1,12 @@
 # Marlin in a simulator: a 3D printer with no printer
 
+![Marlin heating, homing and printing a square on a simulated BTT Octopus](screenshots/print.gif)
+
+*One run of `sim/job.gcode` (2026-11-23, `sim` 0.10.6, committed ELF): the USART1 console in guest time, the
+toolpath rebuilt live from the STEP/DIR pad edges (red extruding, grey travel), and the hotend temperature against
+its target. It ends on Marlin's own `M114`: `X:70.00 Y:70.00 Z:0.30 E:6.40 Count X:5600 Y:5600 Z:120`. In this run
+`M109` returned at 97.30 s. Drawn by `sim/print_video.py` ([mp4](screenshots/print.mp4)).*
+
 Marlin (`bugfix-2.1.x`) built for the BigTreeTech Octopus V1.1 (STM32F446ZE, 12 MHz crystal) and run on a
 simulated STM32F446ZE with the printer around it written as Python peers: a G-code host on the serial port, a
 hotend with a heater and a thermistor, three scripted endstop switches and stepper axes that follow the STEP/DIR
@@ -117,7 +124,7 @@ Other stand-ins: the axes have no inertia, no lost steps and no limit except 0 m
 X 20, Y 25, Z 10 mm (arbitrary parking positions); the endstop switch does not bounce; the heater MOSFET and the
 24 V rail are not modelled, the plant sees the pad level directly.
 
-## Safety: thermal protection
+## More scenarios: thermal protection
 
 ![Thermal runaway, console and temperature](screenshots/safety.gif)
 
