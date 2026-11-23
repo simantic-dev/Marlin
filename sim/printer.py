@@ -25,6 +25,13 @@ STEPS_PER_MM = {"X": 80.0, "Y": 80.0, "Z": 400.0, "E": 500.0}  # DEFAULT_AXIS_ST
 DIR_POSITIVE_LEVEL = {"X": 1, "Y": 0, "Z": 1, "E": 1}
 START_MM = {"X": 20.0, "Y": 25.0, "Z": 10.0, "E": 0.0}        # where the carriages are parked at power-on (arbitrary)
 
+# Fault injection for the safety scenes (sim/safety.sh), from $FAULT:
+#   heater-open   the heater cartridge is disconnected: the plant gets no power whatever the pad does
+#   detach:<s>    the thermistor falls out of the block at <s> guest seconds and reads ambient from then on
+FAULT = os.environ.get("FAULT", "")
+HEATER_OPEN = FAULT == "heater-open"
+DETACH_US = int(float(FAULT.split(":")[1]) * 1e6) if FAULT.startswith("detach:") else None
+
 pos = dict(START_MM)
 steps = {a: 0 for a in "XYZE"}       # signed step count since power-on (E is not hard-stopped)
 temp = T_AMB

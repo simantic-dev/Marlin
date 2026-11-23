@@ -63,7 +63,7 @@ One run of `sim/run.sh`, `sim` 0.10.1, pyrite, 2026-11-16, `--timeout 110`.
 
 Wall time is about 1.4x the virtual time on this machine (an M-series laptop with other jobs running).
 Not run: a heated bed, a TMC driver over UART or SPI, the SD card, USB, bed levelling or a probe, `M303` autotune,
-thermal runaway or MAXTEMP fault injection, a second run to check repeatability, anything on real hardware.
+MAXTEMP/MINTEMP fault injection, a second run to check repeatability, anything on real hardware.
 These are `unverified`.
 
 ## Run it
@@ -116,6 +116,85 @@ to 0.6 and the temperature creeps up to the target. The thermistor voltage is th
 Other stand-ins: the axes have no inertia, no lost steps and no limit except 0 mm; the carriages start at
 X 20, Y 25, Z 10 mm (arbitrary parking positions); the endstop switch does not bounce; the heater MOSFET and the
 24 V rail are not modelled, the plant sees the pad level directly.
+
+## Safety: thermal protection
+
+![Thermal runaway, console and temperature](screenshots/safety.gif)
+
+*Marlin halting on a detached thermistor ([mp4](screenshots/safety.mp4)). Left: USART1 as the host peer received
+it, guest time. Right: the plant temperature and what the firmware read back.*
+
+The same closed loop as above, with one fault injected into the hotend peer (`FAULT=` in `printer.py`): the
+firmware's PID still drives the HEATER_0 pad and the plant still integrates it; only the heater power or the
+thermistor reading is cut. Same committed image (`sim/fw/marlin_octopus.elf`, stock thermal protection:
+`WATCH_TEMP_PERIOD 40`, `WATCH_TEMP_INCREASE 2`, `THERMAL_PROTECTION_PERIOD 40`,
+`THERMAL_PROTECTION_HYSTERESIS 4`). Each scene sends `M155 S1` and `M104` at 2 s.
+
+```
+sim/safety.sh                                      # three scenes into sim/out/safety/, pass = error line + halt
+python sim/safety_plots.py sim/out/safety sim/screenshots --video   # plots, safety.mp4, safety.gif (needs ffmpeg)
+```
+
+One run, `sim` 0.10.6, pyrite, 2026-11-23. All three scenes passed.
+
+| Scene | Fault | Target | Firmware error | Guest s |
+| --- | --- | --- | --- | --- |
+| heating-failed | `heater-open`: heater disconnected, plant gets no power | 200 C | `Heating failed` | 42.03 |
+| early-fall | `detach:39`: thermistor reads ambient from 39 s | 90 C (reached at 37 s) | `Heating failed` | 42.03 |
+| thermal-runaway | `detach:125`: thermistor reads ambient from 125 s | 200 C (held from about 100 s) | `Thermal Runaway` | 164.91 |
+
+**heating-failed.** The PID asks for full power (`@:127`), the temperature never moves, and the 40 s watch armed
+by `M104` expires:
+
+```
+41.002769  T:25.00 /200.00 @:127
+42.002770  T:25.00 /200.00 @:127
+42.029004 Error:Heating failed, system stopped! Heater_ID: E0
+42.030748 echo:Heating Failed
+42.033967 Error:Printer halted. kill() called!
+```
+
+![heating failed](screenshots/safety-heating-failed.png)
+
+**thermal-runaway.** The hotend holds 201 C; at 125 s the thermistor leaves the block. Marlin sees 25 C, drives
+the heater at full power, and halts 40 s later. Meanwhile the plant, still heated, climbs to 238.8 C: on a real
+printer that is the hazard this check exists for.
+
+```
+122.002683  T:201.06 /200.00 @:79
+127.002773  T:25.00 /200.00 @:127
+164.002771  T:25.00 /200.00 @:127
+164.909093 Error:Thermal Runaway, system stopped! Heater_ID: E0
+164.910924 echo:THERMAL RUNAWAY
+164.914144 Error:Printer halted. kill() called!
+```
+
+![thermal runaway](screenshots/safety-thermal-runaway.png)
+
+### Finding: the heating watch is only checked at the end of its period
+
+**early-fall.** The hotend reached its 90 C target at 37 s (`T:90.11 /90.00`), then the thermistor fell at 39 s.
+Marlin reported **Heating failed** at 42 s, not thermal runaway:
+
+```
+37.002680  T:90.11 /90.00 @:42
+42.002770  T:25.00 /90.00 @:127
+42.029004 Error:Heating failed, system stopped! Heater_ID: E0
+```
+
+The watch armed by `M104` (`HeaterWatch` in `temperature.h`, checked in `Temperature::manage_hotends()`) is
+looked at only when its 40 s period expires (2 s + 40 s = 42 s). Reaching the target mid-period does not cancel
+it; at the check the reading (25 C) was below the watch threshold, so the heating-failed path fired first. When a
+check passes but the temperature is still more than `THERMAL_PROTECTION_HYSTERESIS` below the target, the watch
+re-arms for another 40 s. A first runaway attempt with the fall at 120 s hit exactly that: the 82 s check saw
+193 C (below 196 C), re-armed, and the 122 s check reported `Heating failed` at 122.03 s. Moving the fall to 125 s,
+after the watch had disarmed, gives the runaway path. This is Marlin's own logic, not a simulator artefact.
+
+![early fall](screenshots/safety-early-fall.png)
+
+Modelled: the MCU and firmware run unmodified; the hotend is the first-order plant above (not measured); the
+faults are idealised (an open heater delivers exactly 0 W, a detached thermistor reads exactly 25 C at once).
+Not run: MAXTEMP, MINTEMP, a shorted thermistor, a heated bed, anything on real hardware.
 
 ## Gaps
 
