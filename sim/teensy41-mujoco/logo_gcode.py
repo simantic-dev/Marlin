@@ -2,7 +2,7 @@
 
 usage: uv run --with svgelements python logo_gcode.py [width_mm] [layers] [svg] [part] > logo.gcode
 part "a"/"b": only the loops left/right of X 100 (one sim run each stays under 5 min wall with the FOC drive).
-G4 S5 first: the FOC X drive aligns its encoder for 4.5 s before it follows STEP/DIR.
+G4 S10 first: each FOC drive axis aligns its encoder for 4.5 s, one after another, before it follows STEP/DIR.
 Every closed outline in the SVG (rounded square, dot, letter outlines incl. counters) becomes one perimeter,
 sampled to 0.25 mm chords, scaled to width_mm and centred on the 200 x 200 bed.
 """
@@ -52,7 +52,7 @@ mm = [resample(l) for l in mm]
 PART = sys.argv[4] if len(sys.argv) > 4 else ""
 if PART:
     mm = [l for l in mm if (sum(p[0] for p in l) / len(l) < 100) == (PART == "a")]
-g, e = ["G4 S5", "G28", "M302 P1", "G92 E0", "G1 Z5 F600"], 0.0
+g, e = ["G4 S10", "G28", "M302 P1", "G92 E0", "G1 Z5 F600"], 0.0
 for layer in range(LAYERS):
     g.append(f"G1 Z{LAYER_H * (layer + 1):.2f} F600")
     for l in mm:

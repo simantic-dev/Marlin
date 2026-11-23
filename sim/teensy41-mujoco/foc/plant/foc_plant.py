@@ -2,7 +2,8 @@
 # (SimpleFOC BLDCDriver3PWM on Teensy 4.1 pins 4/5/6 = FlexPWM2 SM0/SM1/SM2 channel A, edge-aligned, 12 V supply). The
 # duty is read from FlexPWM2 VAL3/VAL1 (RM ch.54: A sets at VAL2=0, clears at VAL3, period VAL1+1) when OUTEN.PWMA_EN drives the pad; the register file (outer set) is read, which equals the active set once SimpleFOC's LDOK has loaded, and no shunt
 # outputs: the drive has no current sensing. The rotor angle it integrates is shared with
-# mt6835_peer.py through pmsm.MOTOR.
+# mt6835_peer.py through pmsm.MOTORS. config {"axes": "xy"} also drives the Y motor from FlexPWM4 SM0 A, FlexPWM4 SM1 A,
+# FlexPWM1 SM3 A (Teensy pins 22/23/8, foc/PINS.md).
 #
 # Model (rotor dq frame, amplitude-invariant Park): phase-to-neutral volts from the three duty
 # cycles CCRx / ARR; L did/dt = vd - R id + we L iq, L diq/dt = vq - R iq - we L id - we psi;
@@ -12,14 +13,16 @@
 # reaches the rotor only as m.load, the belt torque from peers/printer_plant.py; the plant steps every 40 us (the 25 kHz PWM period) with 10 sub-steps.
 import math
 
-from pmsm import MOTOR
+from pmsm import MOTORS
 
 # Nanotec DB42S02 datasheet (rev 6): delta 0.19 ohm / 0.245 mH line-line -> star-equivalent 0.095 ohm / 0.1225 mH;
 # Kt 0.014 N.m/A = 1.5 P psi -> psi = 2.33 mWb; rotor inertia 2.4e-6 kg m^2. B (bearing drag) is a small stand-in.
 R, L, PSI, P = 0.095, 1.225e-4, 0.014 / (1.5 * 4), 4
 J, B = 2.4e-6, 1e-6
 VBUS = 12.0
-FLEXPWM2 = 0x403E0000
+FLEXPWM1, FLEXPWM2, FLEXPWM4 = 0x403DC000, 0x403E0000, 0x403E8000
+# (FlexPWM base, submodule) for phases A/B/C per axis
+PHASES = {"x": [(FLEXPWM2, 0), (FLEXPWM2, 1), (FLEXPWM2, 2)], "y": [(FLEXPWM4, 0), (FLEXPWM4, 1), (FLEXPWM1, 3)]}
 SM_STRIDE, VAL1, VAL3, OUTEN = 0x60, 0x0E, 0x16, 0x180
 STEP_US, SUB = 40, 10
 
@@ -27,6 +30,7 @@ STEP_US, SUB = 40, 10
 class Peripheral:
     def __init__(self, ctx):
         self.ctx = ctx
+        self.axes = (getattr(ctx, "config", None) or {}).get("axes", "x")
         ctx.schedule_periodic(STEP_US)
 
     def on_access(self, req):
@@ -35,14 +39,16 @@ class Peripheral:
         req.value = 0
 
     def on_timer(self):
-        rd = lambda off: self.ctx.bus_read(FLEXPWM2 + off, 2)
-        outen = rd(OUTEN)
+        for ax in self.axes:
+            self.step(MOTORS[ax], PHASES[ax])
+
+    def step(self, m, phases):
+        rd = lambda addr: self.ctx.bus_read(addr, 2)
         duty = []
-        for sm in range(3):
-            base = sm * SM_STRIDE
-            on = (outen >> (8 + sm)) & 1
-            duty.append(min(rd(base + VAL3) / (rd(base + VAL1) + 1), 1.0) if on else 0.0)
-        m = MOTOR
+        for base, sm in phases:
+            on = (rd(base + OUTEN) >> (8 + sm)) & 1
+            off = base + sm * SM_STRIDE
+            duty.append(min(rd(off + VAL3) / (rd(off + VAL1) + 1), 1.0) if on else 0.0)
         dt = STEP_US * 1e-6 / SUB
         mean = sum(duty) / 3
         vph = [VBUS * (d - mean) for d in duty]
