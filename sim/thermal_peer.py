@@ -25,9 +25,9 @@ class Peripheral:
         self.n += 1
         t = self.n * TICK_US  # a ScriptedPeripheral has no clock; its periodic timer is exact
         duty = printer.heater_take_duty(t, self.last)
-        temp = printer.thermal_step(duty, (t - self.last) / 1e6)
+        temp = printer.thermal_step(0.0 if printer.HEATER_OPEN else duty, (t - self.last) / 1e6)
         self.last = t
-        v = printer.volts_for(temp)
+        v = printer.volts_for(printer.T_AMB if printer.DETACH_US is not None and t >= printer.DETACH_US else temp)
         self.ctx.set_property(ADC, CH, v)
         if self.n % 50 == 0:
             self.log.write(f"{t / 1e6:.3f},{temp:.3f},{duty:.3f},{v:.4f}\n")
