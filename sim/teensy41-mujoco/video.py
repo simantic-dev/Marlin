@@ -17,10 +17,9 @@ render.BEAD_RGBA = [0.1, 0.35, 0.95, 1]  # blue bead: visible on the amber bed
 from accuracy import gcode_segments, nearest
 
 W, H, VW = 1280, 720, 720
-CAM = dict(lookat=(0.1, 0.1, 0.21), distance=0.17, azimuth=90, elevation=-45)
+CAM = dict(lookat=(0.1, 0.1, 0.205), distance=0.22, azimuth=90, elevation=-50)
 TITLE = "Stock Marlin on a simulated Teensy 4.1 + MuJoCo printer"
-FOOT = ("Modelled: MuJoCo mechanics, X on a SimpleFOC servo (2nd simulated Teensy 4.1, PMSM + MT6835), Y/Z/E steppers,\n"
-        "datasheet belt/motor stiffness, stand-in damping (zeta 0.1). Firmware unmodified; pyrite simulator.")
+FOOT = "Stock Marlin, unmodified · X on a closed-loop FOC servo (an upgrade some printers use); Y/Z/E steppers · simulated Teensy 4.1 + MuJoCo"
 BG, FG, DIM = (18, 20, 24), (235, 235, 235), (140, 140, 150)
 
 
@@ -29,14 +28,15 @@ def main(run, gc, out, speed=2.0):
     font = ImageFont.load_default(size=24)
     small = ImageFont.load_default(size=14)
     mono = ImageFont.load_default(size=13)
-    frames = [f for f in render.load(os.path.join(run, "frames.jsonl")) if f["t"] >= 4.5e9]  # skip the G4 S5 encoder alignment
     tr = np.loadtxt(os.path.join(run, "trace.txt"))
     tr_t, ext = tr[:, 0], np.r_[False, np.diff(tr[:, 6]) > 1e-5]
+    start = tr_t[ext][0] - 0.5e9  # open just before the first extrusion: the nozzle is over the print
+    frames = [f for f in render.load(os.path.join(run, "frames.jsonl")) if f["t"] >= start]
     # console: "[dut] [12.345678s] (usb1) text" lines from sim.txt, guest time
     con = []
     for l in open(os.path.join(run, "sim.txt"), errors="replace"):
         m = re.match(r"(?:\[dut\] )?\[(\d+\.\d+)s\] \(usb1\) (.*)", l)
-        if m and m.group(2).strip():
+        if m and m.group(2).strip() and not re.match(r"ok$|echo:busy|//action", m.group(2).strip()):
             con.append((float(m.group(1)) * 1e9, m.group(2).strip()[:60]))
     segs = gcode_segments(gc)
     err = np.zeros(len(tr))
@@ -78,7 +78,7 @@ def main(run, gc, out, speed=2.0):
                font=small, fill=FG)
         g.text((PX, PY + PH + 34), f"path error now {now if ext[k - 1] else 0:5.0f} um   worst so far {worst:5.0f} um", font=small, fill=FG)
         g.rectangle([0, H - 50, W, H], fill=BG)
-        g.multiline_text((16, H - 46), FOOT, font=small, fill=DIM)
+        g.text((16, H - 34), FOOT, font=small, fill=DIM)
         ff.stdin.write(fr.tobytes())
     ff.stdin.close()
     ff.wait()
