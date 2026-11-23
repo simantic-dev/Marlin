@@ -14,4 +14,18 @@ Voltage-mode FOC, SimpleFOC 2.3.4 `BLDCDriver3PWM` (fast PWM via `analogWrite`, 
 | DIR in | 3 | EMC_05 | GPIO4.05 = fast GPIO9.05 |
 
 Duty = VAL3 / (VAL1 + 1) (A sets at VAL2 = 0, clears at VAL3). STEP is attached with `attachInterrupt` on GPIO4 (slow bank); the board wires both banks.
-Scale 2*pi/3200 rad per step (Marlin X: 80 steps/mm, 40 mm/rev). DIR high = positive.
+
+## Y axis (env `teensy41_ff_fast_xy`, `-DDUAL_AXIS`)
+
+Same motor, encoder and gains as X, from the same Teensy and the same `loop()`.
+
+| Signal | Teensy pin | Pad / port | Peripheral |
+|---|---|---|---|
+| Phase A PWM | 22 | AD_B1_08 | FlexPWM4 SM0 A |
+| Phase B PWM | 23 | AD_B1_09 | FlexPWM4 SM1 A |
+| Phase C PWM | 8 | B1_00 | FlexPWM1 SM3 A |
+| MT6835 CS (software) | 9 | B0_11 | GPIO2.11 = fast GPIO7.11, second device on LPSPI4 (`ActiveLowMask 0x3`) |
+| STEP in | 20 | AD_B1_10 | GPIO1.26 = fast GPIO6.26, netted from Marlin Y STEP (dut GPIO9.04) |
+| DIR in | 21 | AD_B1_11 | GPIO1.27 = fast GPIO6.27, netted from Marlin Y DIR (dut GPIO9.05) |
+
+Scale 2*pi/3200 rad per step (Marlin X and Y: 80 steps/mm, 40 mm/rev). DIR high = positive angle; Marlin inverts Y DIR, so the plant mirrors the Y belt.

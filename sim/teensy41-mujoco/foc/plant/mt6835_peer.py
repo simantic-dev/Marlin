@@ -1,5 +1,5 @@
 # MagnTek MT6835 21-bit magnetic angle encoder on SPI1 (PA5/PA6/PA7, CS PA0, mode 3) reading the
-# simulated PMSM's shaft (pmsm.MOTOR). Host type: `spi-device`.
+# simulated PMSM's shaft (pmsm.MOTORS[config "axis"], default "x"). Host type: `spi-device`.
 #
 # Only the transaction the drive firmware sends is modelled: SimpleFOCDrivers' MT6835::readRawAngle21
 # clocks 6 bytes [0xA0, 0x03, 0, 0, 0, 0] (opcode 0b1010 = burst-read angle, register 0x003) and
@@ -9,7 +9,7 @@
 # command reads back zeros.
 import math
 
-from pmsm import MOTOR
+from pmsm import MOTORS
 
 CPR = 1 << 21
 
@@ -30,6 +30,8 @@ class Slave:
         self.cmd = []
         self.out = b""
         self.reads = 0
+        self.axis = (getattr(ctx, "config", None) or {}).get("axis", "x")
+        self.motor = MOTORS[self.axis]
 
     def on_transmit(self, b):
         i = self.beat
@@ -37,12 +39,12 @@ class Slave:
         if i < 2:
             self.cmd.append(b)
             if i == 1 and self.cmd == [0xA0, 0x03]:
-                a = int(MOTOR.theta_m % (2 * math.pi) / (2 * math.pi) * CPR) % CPR
+                a = int(self.motor.theta_m % (2 * math.pi) / (2 * math.pi) * CPR) % CPR
                 regs = bytes([a >> 13, (a >> 5) & 0xFF, (a & 0x1F) << 3])
                 self.out = regs + bytes([crc8(regs)])
                 self.reads += 1
                 if self.reads in (1, 1000, 10000):
-                    self.ctx.info(f"MT6835 angle read #{self.reads}: raw {a}")
+                    self.ctx.info(f"MT6835 {self.axis} angle read #{self.reads}: raw {a}")
             return 0x00
         return self.out[i - 2] if i - 2 < len(self.out) else 0x00
 

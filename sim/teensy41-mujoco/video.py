@@ -17,10 +17,9 @@ render.BEAD_RGBA = [0.1, 0.35, 0.95, 1]  # blue bead: visible on the amber bed
 from accuracy import gcode_segments, nearest
 
 W, H, VW = 1280, 720, 720
-CAM = dict(lookat=(0.1, 0.1, 0.21), distance=0.17, azimuth=90, elevation=-45)
+CAM = dict(lookat=(0.1, 0.1, 0.225), distance=0.19, azimuth=90, elevation=-45)  # low front view: the nozzle sits under the head, the print stays in view
 TITLE = "Stock Marlin on a simulated Teensy 4.1 + MuJoCo printer"
-FOOT = ("Modelled: MuJoCo mechanics, X on a SimpleFOC servo (2nd simulated Teensy 4.1, PMSM + MT6835), Y/Z/E steppers,\n"
-        "datasheet belt/motor stiffness, stand-in damping (zeta 0.1). Firmware unmodified; pyrite simulator.")
+FOOT = "X and Y on closed-loop FOC servos (an upgrade some printers use); Z/E steppers"
 BG, FG, DIM = (18, 20, 24), (235, 235, 235), (140, 140, 150)
 
 
@@ -29,15 +28,25 @@ def main(run, gc, out, speed=2.0):
     font = ImageFont.load_default(size=24)
     small = ImageFont.load_default(size=14)
     mono = ImageFont.load_default(size=13)
-    frames = [f for f in render.load(os.path.join(run, "frames.jsonl")) if f["t"] >= 4.5e9]  # skip the G4 S5 encoder alignment
     tr = np.loadtxt(os.path.join(run, "trace.txt"))
     tr_t, ext = tr[:, 0], np.r_[False, np.diff(tr[:, 6]) > 1e-5]
+    start = tr_t[ext][0]  # open on the first extrusion: the head has parked at the logo's top-left corner
+    frames = [f for f in render.load(os.path.join(run, "frames.jsonl")) if f["t"] >= start]
     # console: "[dut] [12.345678s] (usb1) text" lines from sim.txt, guest time
-    con = []
+    # drive: "[xdrive] [t] (usb1) t=.. x target=.. angle=.. ... loop_hz=.." status lines, every 100 ms
+    con, drv = [], []
     for l in open(os.path.join(run, "sim.txt"), errors="replace"):
-        m = re.match(r"(?:\[dut\] )?\[(\d+\.\d+)s\] \(usb1\) (.*)", l)
-        if m and m.group(2).strip():
-            con.append((float(m.group(1)) * 1e9, m.group(2).strip()[:60]))
+        m = re.match(r"\[(dut|xdrive)\] \[(\d+\.\d+)s\] \(usb1\) (.*)", l)
+        if not m:
+            continue
+        t, txt = float(m.group(2)) * 1e9, m.group(3).strip()
+        if m.group(1) == "xdrive":
+            ax = re.findall(r"(\w) target=(\S+) angle=(\S+) maxerr=\S+ loop_hz=(\d+)", txt)
+            if ax:  # angle error in um of belt: 40 mm per rev
+                drv.append((t, "   ".join(f"{a.upper()} {abs(float(tg) - float(an)) * 40e3 / 6.2832:4.0f} um" for a, tg, an, _ in ax)
+                            + f"   loop {ax[0][3]} Hz per motor"))
+        elif txt and not re.match(r"ok$|echo:|//action", txt) and (not con or con[-1][1] != txt[:60]):
+            con.append((t, txt[:60]))
     segs = gcode_segments(gc)
     err = np.zeros(len(tr))
     err[ext] = nearest(tr[ext][:, 1:3], segs) * 1000
@@ -70,15 +79,19 @@ def main(run, gc, out, speed=2.0):
         g.text((16, 14), TITLE, font=font, fill=FG)
         g.text((PX, PY - 22), "top view: G-code (grey) vs printed path, amber 0 um -> red >= 150 um", font=small, fill=DIM)
         g.text((PX, 70), "Marlin console (USB CDC)", font=small, fill=DIM)
-        lines = [c for c in con if c[0] <= f["t"]][-14:]
+        lines = [c for c in con if c[0] <= f["t"]][-7:]
         for i, (t, txt) in enumerate(lines):
             g.text((PX, 92 + i * 16), f"{t / 1e9:7.2f}  {txt}", font=mono, fill=FG)
+        g.text((PX, 222), "FOC drive (2nd Teensy 4.1): angle error now", font=small, fill=DIM)
+        dl = [c for c in drv if c[0] <= f["t"]][-1:]
+        if dl:
+            g.text((PX, 244), f"{dl[0][0] / 1e9:7.2f}  {dl[0][1]}", font=mono, fill=FG)
         x, y, z = (v * 1000 for v in f["q"])
         g.text((PX, PY + PH + 14), f"t {f['t'] / 1e9:6.2f} s virtual   X {x:7.2f}  Y {y:7.2f}  Z {z:5.2f} mm   ({speed:g}x)",
                font=small, fill=FG)
         g.text((PX, PY + PH + 34), f"path error now {now if ext[k - 1] else 0:5.0f} um   worst so far {worst:5.0f} um", font=small, fill=FG)
         g.rectangle([0, H - 50, W, H], fill=BG)
-        g.multiline_text((16, H - 46), FOOT, font=small, fill=DIM)
+        g.text((16, H - 34), FOOT, font=small, fill=DIM)
         ff.stdin.write(fr.tobytes())
     ff.stdin.close()
     ff.wait()

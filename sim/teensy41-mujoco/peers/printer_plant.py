@@ -6,8 +6,9 @@
 #   "mjcf":   MuJoCo scene; with it, the carriages move in MuJoCo and the endstops read the carriage position
 #   "frames": path, 30 fps {"t","q","c","e"} for render.py
 #   "trace":  path, 1 kHz "t_ns qx qy qz tx ty e" for metrics
-#   "x_drive": {"pmsm_dir": "<dir of foc/plant/pmsm.py>"}: X is a BLDC servo on another machine; the belt couples its
-#             rotor (pmsm.MOTOR) to the carriage, and the belt force goes back to the rotor as load torque
+#   "x_drive": {"pmsm_dir": "<dir of foc/plant/pmsm.py>", "axes": "x" | "xy"}: those axes are BLDC servos on another
+#             machine; the belt couples each rotor (pmsm.MOTORS[axis]) to its carriage, and the belt force goes back to
+#             the rotor as load torque. Y is mirrored: Marlin inverts Y DIR, and the drive turns DIR high into +angle
 #   "phys_us": plant step (default PHYS_US)
 #   "thermal": {"table": "<Marlin thermistor_1.h>", "trace": path, "fault": {"t": s, "kind": "open"|"dead"}, "scale": k}: first-order
 #             hotend and bed (class Thermal). Heater pins 37/36 (inputs 8/9) and fan pin 29 (input 10) are read; the thermistor
@@ -128,7 +129,7 @@ class Slave:
         self.log = open(cfg["log"], "w", buffering=1) if cfg.get("log") else None
         self.mj = bool(cfg.get("mjcf"))
         self.phys_us = cfg.get("phys_us", PHYS_US)
-        self.motor = None
+        self.motors = {}  # axis index -> (pmsm Motor, start angle)
         self.th = Thermal(cfg["thermal"]) if cfg.get("thermal") else None
         if self.th:
             import sys
@@ -136,8 +137,8 @@ class Slave:
         if cfg.get("x_drive"):
             import sys
             sys.path.insert(0, cfg["x_drive"]["pmsm_dir"])
-            from pmsm import MOTOR
-            self.motor, self.th0 = MOTOR, MOTOR.theta_m
+            from pmsm import MOTORS
+            self.motors = {"xy".index(ax): (MOTORS[ax], MOTORS[ax].theta_m) for ax in cfg["x_drive"].get("axes", "x")}
         if self.mj:
             self._init_mujoco(cfg)
             ctx.schedule_periodic(self.phys_us)
@@ -157,7 +158,7 @@ class Slave:
         mujoco.mj_setConst(m, self.data)
         mass = {"x": m.body_subtreemass[m.body("carriage").id], "y": m.body_subtreemass[m.body("gantry").id]}
         self.c = {ax: 2 * phys[ax]["zeta"] * math.sqrt(phys[ax]["k"] * mass[ax]) for ax in "xy"}
-        self.belt_c = 2 * phys["x"]["zeta"] * math.sqrt(BELT_K * mass["x"])
+        self.belt_c = {ax: 2 * phys[ax]["zeta"] * math.sqrt(BELT_K * mass[ax]) for ax in "xy"}
         self.qadr = [m.jnt_qposadr[m.joint(n).id] for n in "xyz"]
         self.vadr = [m.jnt_dofadr[m.joint(n).id] for n in "xyz"]
         self.act = [m.actuator(n).id for n in ("mx", "my")]
@@ -194,12 +195,13 @@ class Slave:
                 cmd += self.lost[a] + self.phys["xy"[a]]["micro_err"] * FULL_STEP_M * math.sin(2 * math.pi * cmd / CYCLE_M)
             self.target[a] = self._play(a, cmd)
         for i, ax in enumerate("xy"):
-            if i == 0 and self.motor:
-                m = self.motor
-                xm = START_MM[0] / 1000 + (m.theta_m - self.th0) * R_PULLEY
-                f = BELT_K * (xm - d.qpos[self.qadr[0]]) + self.belt_c * (m.wm * R_PULLEY - d.qvel[self.vadr[0]])
-                d.ctrl[self.act[0]] = f
-                m.load = f * R_PULLEY
+            if i in self.motors:
+                m, th0 = self.motors[i]
+                sgn = -1 if INVERT_DIR[i] else 1
+                xm = START_MM[i] / 1000 + sgn * (m.theta_m - th0) * R_PULLEY
+                f = BELT_K * (xm - d.qpos[self.qadr[i]]) + self.belt_c[ax] * (sgn * m.wm * R_PULLEY - d.qvel[self.vadr[i]])
+                d.ctrl[self.act[i]] = f
+                m.load = sgn * f * R_PULLEY
                 continue
             p = self.phys[ax]
             err = self.target[i] - d.qpos[self.qadr[i]]

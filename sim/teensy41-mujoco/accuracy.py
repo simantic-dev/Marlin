@@ -14,7 +14,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-COLORS = ["tab:red", "tab:blue"]
+COLORS = ["tab:red", "tab:orange", "tab:blue"]
 
 
 def gcode_segments(path):
@@ -81,7 +81,7 @@ def main(gc, runs):
             ax.plot(p[:, 1], p[:, 2], ".", ms=1.2, color=c, label=f"printed ({lab})", zorder=2)
         ax.set_aspect("equal")
     axs[0].plot([], [], color="0.6", label="G-code (commanded)")
-    axs[0].legend(loc="upper right", markerscale=6, fontsize=8)
+    axs[0].legend(loc="upper center", bbox_to_anchor=(0.5, -0.1), ncol=4, markerscale=6, fontsize=8)
     axs[0].add_patch(plt.Rectangle((wx - 1.5, wy - 1.5), 3, 3, fill=False, color="k"))
     axs[0].set_title("Commanded vs printed path, whole print (mm)")
     axs[1].set_xlim(wx - 1.5, wx + 1.5); axs[1].set_ylim(wy - 1.5, wy + 1.5)

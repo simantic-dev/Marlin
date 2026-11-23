@@ -96,13 +96,29 @@ def gcode(heat=False):
     return "\n".join(L) + "\n"
 
 
-def run(name, phys, foc=False, thermal=None, gc=None, timeout=24, mj=True):
+DRIVE_BOARD_Y = """
+encoder_y: SPI.ScriptedSpiSlave @ mux 1
+    file: "{d}/plant/mt6835_peer.py"
+    config: "{{\\"axis\\": \\"y\\"}}"
+
+gpio2:
+    11 -> mux@1
+gpio7:
+    11 -> mux@1
+"""
+# Marlin Y STEP/DIR (dut fast GPIO9.04/9.05) -> drive pins 20/21 (fast GPIO6.26/6.27)
+FOC_NETS_Y = """  - [dut.gpio9.4, xdrive.gpio6.26]
+  - [dut.gpio9.5, xdrive.gpio6.27]
+"""
+
+
+def run(name, phys, foc=False, thermal=None, gc=None, timeout=24, mj=True, axes="x"):
     d = os.path.join(HERE, "out", name)
     os.makedirs(d, exist_ok=True)
     cfg = {"mjcf": os.path.join(HERE, "printer.xml"), "phys": phys,
            "trace": os.path.join(d, "trace.txt"), "frames": os.path.join(d, "frames.jsonl")} if mj else {}
     if foc:
-        cfg.update(x_drive={"pmsm_dir": os.path.join(FOC_DIR, "plant")}, phys_us=40)
+        cfg.update(x_drive={"pmsm_dir": os.path.join(FOC_DIR, "plant"), "axes": axes}, phys_us=40)
     if thermal is not None:
         cfg["thermal"] = {"table": THERMISTOR_H, "trace": os.path.join(d, "thermal.txt"), **thermal}
     board = open(os.path.join(HERE, "printer.board")).read()
@@ -120,8 +136,12 @@ def run(name, phys, foc=False, thermal=None, gc=None, timeout=24, mj=True):
     if thermal is not None:  # the peer drives A1/A2 itself; fixed points would overwrite it every slice
         scen = scen.replace("    analog:\n", "").replace("      - {adc: adc1, pin: A2, points: [[0, 3.152]]}\n", "").replace("      - {adc: adc1, pin: A1, points: [[0, 3.152]]}\n", "")
     if foc:
-        open(os.path.join(d, "drive.board"), "w").write(DRIVE_BOARD.format(d=FOC_DIR))
-        scen += f"  xdrive:\n    mcu: Teensy41\n    elf: {FOC_ELF.replace('teensy41/', FOC_ENV[name] + '/')}\n    overlay: drive.board\n" + FOC_NETS
+        drive = DRIVE_BOARD.format(d=FOC_DIR)
+        if axes == "xy":
+            drive = drive.replace("ActiveLowMask: 0x1", "ActiveLowMask: 0x3").replace(
+                '    size: 0x4\n', '    size: 0x4\n    config: "{\\"axes\\": \\"xy\\"}"\n', 1) + DRIVE_BOARD_Y.format(d=FOC_DIR)
+        open(os.path.join(d, "drive.board"), "w").write(drive)
+        scen += f"  xdrive:\n    mcu: Teensy41\n    elf: {FOC_ELF.replace('teensy41/', FOC_ENV[name] + '/')}\n    overlay: drive.board\n" + FOC_NETS + (FOC_NETS_Y if axes == "xy" else "")
     open(os.path.join(d, "scenario.yaml"), "w").write(scen)
     env = {**os.environ, "PYTHONPATH": MUJOCO_SITE}
     with open(os.path.join(d, "sim.txt"), "w") as out:
