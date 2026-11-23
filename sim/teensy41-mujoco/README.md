@@ -10,7 +10,7 @@ Marlin `bugfix-2.1.x` (revision 9efefed, 2026-11-20), built with `env:teensy41` 
 pyrite simulator. G-code goes in over USB CDC. A Python peer counts the STEP/DIR pad edges, each stamped at its own
 virtual time, drives the endstops and steps a MuJoCo Cartesian printer every 40 us of virtual time.
 
-The X axis is not a stepper. Marlin's X STEP/DIR pins are wired to a **second simulated Teensy 4.1** running a
+**X on a closed-loop FOC servo (an upgrade some printers use); Y/Z/E steppers.** Most printers run every axis open-loop on steppers. Here the X axis is not a stepper. Marlin's X STEP/DIR pins are wired to a **second simulated Teensy 4.1** running a
 SimpleFOC 2.3.4 servo drive (voltage-mode FOC, `StepDirListener`, velocity feedforward from the step rate). The drive
 reads an MT6835 encoder over LPSPI4 and drives a 3-PWM bridge on FlexPWM2. A PMSM model (Nanotec DB42S02 values)
 turns the rotor, and a GT2 belt couples it to the MuJoCo carriage. Y, Z and E are steppers. The servo lags and
@@ -30,6 +30,8 @@ nearest extruding G-code segment. Following error is Marlin's step-counted posit
 ![Commanded vs printed path](graphs/overlay.png)
 
 *The whole print, with a zoom on the worst point: the FOC run overshoots the tip of the final "c" by 169 um.*
+
+Is the FOC overshoot from the SimpleFOC controller or from the plant model? Not yet tested: a sweep of plant damping and belt stiffness with the FOC gains unchanged was started but not finished.
 
 ![Path error vs time, commanded speed below](graphs/error_vs_time.png)
 
