@@ -1,0 +1,19 @@
+// Marlin pins_TEENSY4x.h on a Teensy 4.1 (pad = core_pins.h CORE_PINn_PORTREG/BIT; fast GPIO6-9 = GPIO1-4).
+// Inputs 0-2 = X/Y/Z STEP, 3-5 = X/Y/Z DIR, 6/7 = E STEP/DIR. Outputs 0-2 = X/Y/Z min endstops, so an
+// on_burst reply on STEP line n lands on endstop n at the exact step time.
+printer: Scripted.ScriptedGpioPeer @ none
+    file: "peers/printer_plant.py"
+    config: "{\"log\": \"out/steps.log\", \"mjcf\": \"printer.xml\", \"frames\": \"out/frames.jsonl\"}"
+    numberOfGpios: 3
+    0 -> gpio1@29 | gpio6@29
+    1 -> gpio1@28 | gpio6@28
+    2 -> gpio1@12 | gpio6@12
+
+gpio6: 3 -> printer@0
+gpio9: 4 -> printer@1
+gpio9: 6 -> printer@2
+gpio6: 2 -> printer@3
+gpio9: 5 -> printer@4
+gpio9: 8 -> printer@5
+gpio7: 11 -> printer@6
+gpio7: 0 -> printer@7

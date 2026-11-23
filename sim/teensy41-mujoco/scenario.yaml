@@ -1,0 +1,11 @@
+# Stock Marlin (bugfix-2.1.x, env teensy41) on a Teensy 4.1 driving a Cartesian printer plant.
+# Thermistors (TEMP_SENSOR 1, 100k NTC, 4.7k pull-up to 3.3 V) sit at 25 C: 3.3 * 100 / 104.7 = 3.152 V.
+# Motion cases hold the thermistors at 25 C; thermal.py swaps in the heater model (peers/thermal_peer.py).
+machines:
+  dut:
+    mcu: Teensy41
+    elf: ../../../marlin-t41/.pio/build/teensy41/firmware.elf
+    overlay: printer.board
+    analog:
+      - {adc: adc1, pin: A2, points: [[0, 3.152]]}
+      - {adc: adc1, pin: A1, points: [[0, 3.152]]}

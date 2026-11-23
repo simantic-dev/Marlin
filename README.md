@@ -1,3 +1,7 @@
+> **Headline demo:** [`sim/teensy41-mujoco/`](sim/teensy41-mujoco/README.md): stock Marlin on a simulated Teensy 4.1 prints the Simantic logo on a MuJoCo printer, its X axis on a simulated SimpleFOC servo (FOC). The path error comes from the run logs: 50 um RMS, 169 um max.
+>
+> ![Marlin prints the Simantic logo in MuJoCo](sim/teensy41-mujoco/media/logo-foc.gif)
+
 > **This fork:** [`sim/`](sim/README.md) runs Marlin on a simulated STM32F446ZE (BTT Octopus V1.1) with a simulated hotend, endstops and G-code host, no printer needed. Unofficial; GPL-3.0 as upstream.
 
 ![Marlin printing on a simulated BTT Octopus](sim/screenshots/print.gif)
