@@ -13,6 +13,25 @@ import sys
 import numpy as np
 
 PAD = 0.3e9
+OK = re.compile(r"^(\[dut\] \[\d+\.\d+s\] )\(usb1\) ok\b")
+
+
+def tagged(half):
+    """sim.txt of one half with the incoming G-code lines added. Marlin acks every line once, in order, so the Nth
+    ok answers the Nth command of logo-<a|b>.gcode; command N+1 is shown right after ok N, when Marlin takes it."""
+    gc = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"logo-{half.rstrip('/')[-1]}.gcode")
+    cmds = iter([c for c in (l.split(";")[0].strip() for l in open(gc)) if c])
+    first = True
+    for l in open(os.path.join(half, "sim.txt"), errors="replace"):
+        m = OK.match(l)
+        if m and first:
+            yield f"{m.group(1)}(usb1 in) {next(cmds, '?')}\n"
+            first = False
+        yield l
+        if m:
+            c = next(cmds, None)
+            if c:
+                yield f"{m.group(1)}(usb1 in) {c}\n"
 
 
 def main(a, b, out):
@@ -40,11 +59,11 @@ def main(a, b, out):
                 f.write(json.dumps(fr) + "\n")
     stamp = re.compile(r"^((?:\[\w+\] )?\[)(\d+\.\d+)(s\].*)")
     with open(os.path.join(out, "sim.txt"), "w") as f:
-        for l in open(os.path.join(a, "sim.txt"), errors="replace"):
+        for l in tagged(a):
             m = stamp.match(l)
             if not m or float(m.group(2)) * 1e9 <= a_end:
                 f.write(l)
-        for l in open(os.path.join(b, "sim.txt"), errors="replace"):
+        for l in tagged(b):
             m = stamp.match(l)
             if m and float(m.group(2)) * 1e9 >= b_start:
                 f.write(f"{m.group(1)}{(float(m.group(2)) * 1e9 + shift) / 1e9:.6f}{m.group(3)}\n")
