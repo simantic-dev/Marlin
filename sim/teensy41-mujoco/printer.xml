@@ -3,7 +3,7 @@
 <mujoco model="cartesian-printer">
   <option timestep="0.0005" gravity="0 0 -9.81"/>
   <visual>
-    <global offwidth="1280" offheight="720"/>
+    <global offwidth="1280" offheight="720" fovy="20"/>
     <quality shadowsize="4096"/>
     <headlight ambient=".35 .35 .35" diffuse=".5 .5 .5"/>
   </visual>
@@ -37,8 +37,12 @@
       <geom type="box" size=".14 .008 .008" pos=".1 0 0" material="rail" mass=".6"/>
       <body name="carriage" pos="0 0 0">
         <joint name="x" type="slide" axis="1 0 0" range="-.01 .21" damping="2"/>
-        <geom type="box" size=".022 .02 .03" pos="0 0 -.02" material="head" mass=".35"/>
-        <geom type="cylinder" size=".004 .012" pos="0 0 -.062" rgba=".8 .7 .2 1" mass=".02"/>
+        <!-- Physics: the original head and nozzle geoms keep their mass and inertia but are not drawn (group 3). -->
+        <geom type="box" size=".022 .02 .03" pos="0 0 -.02" material="head" mass=".35" group="3"/>
+        <geom type="cylinder" size=".004 .012" pos="0 0 -.062" rgba=".8 .7 .2 1" mass=".02" group="3"/>
+        <!-- VISUAL ONLY (MODELED SIMPLIFICATION): a slim head so the camera sees the print. Massless, no contacts. -->
+        <geom type="box" size=".004 .004 .02" pos="0 0 -.03" material="head" mass="0" contype="0" conaffinity="0"/>
+        <geom type="cylinder" size=".002 .006" pos="0 0 -.056" rgba=".8 .7 .2 1" mass="0" contype="0" conaffinity="0"/>
         <site name="nozzle" pos="0 0 -.075" size=".001"/>
       </body>
     </body>

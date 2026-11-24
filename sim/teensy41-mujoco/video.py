@@ -17,7 +17,7 @@ render.BEAD_RGBA = [0.1, 0.35, 0.95, 1]  # blue bead: visible on the amber bed
 from accuracy import gcode_segments, nearest
 
 W, H, VW = 1280, 720, 720
-CAM = dict(lookat=(0.1, 0.1, 0.225), distance=0.19, azimuth=90, elevation=-45)  # low front view: the nozzle sits under the head, the print stays in view
+CAM = dict(lookat=(0.1, 0.1, 0.225), distance=0.23, azimuth=90, elevation=-75)  # near top-down on the 80 mm logo (fovy 20 in printer.xml)
 TITLE = "Stock Marlin on a simulated Teensy 4.1 + MuJoCo printer"
 FOOT = "X and Y on closed-loop FOC servos (an upgrade some printers use); Z/E steppers"
 BG, FG, DIM = (18, 20, 24), (235, 235, 235), (140, 140, 150)
@@ -47,6 +47,7 @@ def main(run, gc, out, speed=2.0):
                             + f"   loop {ax[0][3]} Hz per motor"))
         elif txt and not re.match(r"ok$|echo:|//action", txt) and (not con or con[-1][1] != txt[:60]):
             con.append((t, txt[:60]))
+    foot = FOOT if any(" Y " in t for _, t in drv) else "X on a closed-loop FOC servo (an upgrade some printers use); Y/Z/E steppers"
     segs = gcode_segments(gc)
     err = np.zeros(len(tr))
     err[ext] = nearest(tr[ext][:, 1:3], segs) * 1000
@@ -91,7 +92,9 @@ def main(run, gc, out, speed=2.0):
                font=small, fill=FG)
         g.text((PX, PY + PH + 34), f"path error now {now if ext[k - 1] else 0:5.0f} um   worst so far {worst:5.0f} um", font=small, fill=FG)
         g.rectangle([0, H - 50, W, H], fill=BG)
-        g.text((16, H - 34), FOOT, font=small, fill=DIM)
+        g.text((16, H - 34), foot, font=small, fill=DIM)
+        ff.stdin.write(fr.tobytes())
+    for _ in range(round(60 * speed)):  # hold the parked last frame 2 s
         ff.stdin.write(fr.tobytes())
     ff.stdin.close()
     ff.wait()

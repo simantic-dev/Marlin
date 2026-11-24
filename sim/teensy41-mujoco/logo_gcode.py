@@ -61,7 +61,7 @@ for layer in range(LAYERS):
         for a, b in zip(l, l[1:]):
             e += math.dist(a, b) * EF
             g.append(f"G1 X{b[0]:.3f} Y{b[1]:.3f} E{e:.4f}")
-g += ["G1 Z5 F600", "M400", "M114"]
+g += ["G1 Z5 F600", "G1 X195 Y195 F6000", "M400", "M114"]  # park in the back corner: the last frame shows the whole logo
 print("\n".join(g))
 path = sum(math.dist(a, b) for l in mm for a, b in zip(l, l[1:])) * LAYERS
 print(f"; {len(mm)} loops, {path:.0f} mm printed, {len(g)} lines", file=sys.stderr)
