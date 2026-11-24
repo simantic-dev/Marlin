@@ -36,17 +36,17 @@ def main(run, gc, out, speed=2.0):
     # drive: "[xdrive] [t] (usb1) t=.. x target=.. angle=.. ... loop_hz=.." status lines, every 100 ms
     con, drv = [], []
     for l in open(os.path.join(run, "sim.txt"), errors="replace"):
-        m = re.match(r"\[(dut|xdrive)\] \[(\d+\.\d+)s\] \(usb1\) (.*)", l)
+        m = re.match(r"\[(dut|xdrive)\] \[(\d+\.\d+)s\] \(usb1( in)?\) (.*)", l)
         if not m:
             continue
-        t, txt = float(m.group(2)) * 1e9, m.group(3).strip()
+        t, txt = float(m.group(2)) * 1e9, ("> " if m.group(3) else "") + m.group(4).strip()
         if m.group(1) == "xdrive":
             ax = re.findall(r"(\w) target=(\S+) angle=(\S+) maxerr=\S+ loop_hz=(\d+)", txt)
             if ax:  # angle error in um of belt: 40 mm per rev
                 drv.append((t, "   ".join(f"{a.upper()} {abs(float(tg) - float(an)) * 40e3 / 6.2832:4.0f} um" for a, tg, an, _ in ax)
                             + f"   loop {ax[0][3]} Hz per motor"))
-        elif txt and not re.match(r"ok$|echo:|//action", txt) and (not con or con[-1][1] != txt[:60]):
-            con.append((t, txt[:60]))
+        elif txt and not re.match(r"echo:|//action", txt):
+            con.append((t, txt[:64]))
     foot = FOOT if any(" Y " in t for _, t in drv) else "X on a closed-loop FOC servo (an upgrade some printers use); Y/Z/E steppers"
     segs = gcode_segments(gc)
     err = np.zeros(len(tr))
@@ -79,10 +79,10 @@ def main(run, gc, out, speed=2.0):
         g.rectangle([0, 0, W, 58], fill=BG)
         g.text((16, 14), TITLE, font=font, fill=FG)
         g.text((PX, PY - 22), "top view: G-code (grey) vs printed path, amber 0 um -> red >= 150 um", font=small, fill=DIM)
-        g.text((PX, 70), "Marlin console (USB CDC)", font=small, fill=DIM)
+        g.text((PX, 70), "Marlin console (USB CDC): > G-code in (dim), firmware replies", font=small, fill=DIM)
         lines = [c for c in con if c[0] <= f["t"]][-7:]
         for i, (t, txt) in enumerate(lines):
-            g.text((PX, 92 + i * 16), f"{t / 1e9:7.2f}  {txt}", font=mono, fill=FG)
+            g.text((PX, 92 + i * 16), f"{t / 1e9:7.2f}  {txt}", font=mono, fill=DIM if txt.startswith("> ") else FG)
         g.text((PX, 222), "FOC drive (2nd Teensy 4.1): angle error now", font=small, fill=DIM)
         dl = [c for c in drv if c[0] <= f["t"]][-1:]
         if dl:
