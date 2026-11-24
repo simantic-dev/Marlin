@@ -10,6 +10,7 @@ import subprocess
 import sys
 
 import numpy as np
+from matplotlib import colormaps
 from PIL import Image, ImageDraw, ImageFont
 
 import render
@@ -21,6 +22,13 @@ CAM = dict(lookat=(0.1, 0.1, 0.225), distance=0.19, azimuth=90, elevation=-45)  
 TITLE = "Stock Marlin on a simulated Teensy 4.1 + MuJoCo printer"
 FOOT = "X and Y on closed-loop FOC servos (an upgrade some printers use); Z/E steppers"
 BG, FG, DIM = (18, 20, 24), (235, 235, 235), (140, 140, 150)
+EMAX = 150  # um: top of the error colour scale (turbo: blue 0 um -> green -> yellow -> red >= EMAX)
+TURBO = colormaps["turbo"]
+
+
+def ecol(e):
+    r, g, b, _ = TURBO(0.1 + 0.9 * min(1.0, e / EMAX))  # skip turbo's darkest blues, unreadable on the dark panel
+    return int(r * 255), int(g * 255), int(b * 255)
 
 
 def main(run, gc, out, speed=2.0):
@@ -61,6 +69,11 @@ def main(run, gc, out, speed=2.0):
     d = ImageDraw.Draw(base)
     for a in segs:
         d.line([to(a[0], a[1]), to(a[2], a[3])], fill=(90, 90, 100), width=1)
+    bx, by, bw = PX + 4, PY - 52, 160  # colour key for the path error, on its own line above the label
+    for i in range(bw):
+        d.line([(bx + i, by), (bx + i, by + 8)], fill=ecol(EMAX * i / (bw - 1)))
+    for v in (0, 50, 100, 150):
+        d.text((bx + v / EMAX * (bw - 1) - 6, by + 10), f"{v}" + ("+" if v == EMAX else ""), font=ImageFont.load_default(size=10), fill=DIM)
     ff = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}",
                            "-r", str(round(30 * speed)), "-i", "-", "-pix_fmt", "yuv420p", "-c:v", "libx264", "-crf", "23", out],
                           stdin=subprocess.PIPE)
@@ -69,8 +82,7 @@ def main(run, gc, out, speed=2.0):
         while k < len(tr_t) and tr_t[k] <= f["t"]:
             if ext[k]:
                 p = to(tr[k, 1], tr[k, 2])
-                c = min(1.0, err[k] / 150)  # amber at 0 um -> red at >= 150 um
-                d.ellipse([p[0] - 0.9, p[1] - 0.9, p[0] + 0.9, p[1] + 0.9], fill=(245, int(190 * (1 - c) + 30 * c), int(40 * (1 - c))))
+                d.ellipse([p[0] - 1, p[1] - 1, p[0] + 1, p[1] + 1], fill=ecol(err[k]))
                 worst, now = max(worst, err[k]), err[k]
             k += 1
         fr = base.copy()
@@ -78,7 +90,7 @@ def main(run, gc, out, speed=2.0):
         g = ImageDraw.Draw(fr)
         g.rectangle([0, 0, W, 58], fill=BG)
         g.text((16, 14), TITLE, font=font, fill=FG)
-        g.text((PX, PY - 22), "top view: G-code (grey) vs printed path, amber 0 um -> red >= 150 um", font=small, fill=DIM)
+        g.text((PX, PY - 22), "top view: G-code (grey), printed path by error (um)", font=small, fill=DIM)
         g.text((PX, 70), "Marlin console (USB CDC): > G-code in (dim), firmware replies", font=small, fill=DIM)
         lines = [c for c in con if c[0] <= f["t"]][-7:]
         for i, (t, txt) in enumerate(lines):
