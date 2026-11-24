@@ -17,7 +17,7 @@ render.BEAD_RGBA = [0.1, 0.35, 0.95, 1]  # blue bead: visible on the amber bed
 from accuracy import gcode_segments, nearest
 
 W, H, VW = 1280, 720, 720
-CAM = dict(lookat=(0.1, 0.1, 0.225), distance=0.23, azimuth=90, elevation=-75)  # near top-down on the 80 mm logo (fovy 20 in printer.xml)
+CAM = dict(lookat=(0.1, 0.1, 0.225), distance=0.19, azimuth=90, elevation=-45)  # low front view: the nozzle sits under the head, the print stays in view
 TITLE = "Stock Marlin on a simulated Teensy 4.1 + MuJoCo printer"
 FOOT = "X and Y on closed-loop FOC servos (an upgrade some printers use); Z/E steppers"
 BG, FG, DIM = (18, 20, 24), (235, 235, 235), (140, 140, 150)

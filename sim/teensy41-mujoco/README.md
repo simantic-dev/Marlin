@@ -64,7 +64,5 @@ python video.py out/logo-foc logo.gcode media/logo-foc.mp4 2
 - MODELED SIMPLIFICATION: belt and rail damping (zeta 0.1) is a stand-in, no datasheet value.
 - MODELED SIMPLIFICATION: each run is two half prints (`logo-a`, `logo-b`) joined by `merge_halves.py`, because one
   FOC run over the whole logo takes over 5 min wall time.
-- MODELED SIMPLIFICATION: the drawn toolhead is slimmed for the camera; the original head geoms keep their mass and
-  inertia but are hidden (visual only, no physics change).
 - Not yet tested: whether the servo overshoot comes from the SimpleFOC gains or the plant model.
 - Not modelled: step loss, heating (thermistors held at 25 C), more than one layer.
