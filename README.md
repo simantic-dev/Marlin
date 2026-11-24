@@ -1,4 +1,4 @@
-> **Headline demo:** [`sim/teensy41-mujoco/`](sim/teensy41-mujoco/README.md): stock Marlin on a simulated Teensy 4.1 prints the Simantic logo on a MuJoCo printer, with X and Y on simulated closed-loop FOC servos. Path error from the run logs: 52 um RMS, 188 um max with both servo axes (14 um RMS on steppers).
+> **Headline demo:** [`sim/teensy41-mujoco/`](sim/teensy41-mujoco/README.md): stock Marlin on a simulated Teensy 4.1 prints the Simantic logo on a MuJoCo printer, with X on a simulated closed-loop FOC servo (shown). Path error from the run logs: 36 um RMS, 141 um max with the X servo, 52 um RMS with X and Y on servos, 14 um RMS on steppers.
 >
 > ![Marlin prints the Simantic logo in MuJoCo](sim/teensy41-mujoco/media/logo-foc.gif)
 
